@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>방치형 게임 - ID 회원가입</title>
+  <title>방치형 식물 키우기</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
@@ -22,8 +22,6 @@
     .tab-menu { display: flex; margin-bottom: 16px; border-bottom: 2px solid #eee; }
     .tab-btn { flex: 1; padding: 10px; cursor: pointer; font-weight: bold; color: #888; text-align: center; background: none; border: none; font-size: 1rem; margin: 0; }
     .tab-btn.active { color: #4CAF50; border-bottom: 2px solid #4CAF50; }
-    
-    #logMsg { margin-top: 12px; font-size: 0.85rem; color: #e53935; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -31,7 +29,7 @@
 <div class="card">
   <h2>🌱 방치형 식물 키우기</h2>
 
-  <!-- 1. 계정 인증 화면 -->
+  <!-- 1. 로그인 / 회원가입 화면 -->
   <div id="authSection">
     <div class="tab-menu">
       <button type="button" id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">로그인</button>
@@ -49,7 +47,6 @@
     </div>
 
     <button type="button" id="btnAuthSubmit" onclick="handleAuthSubmit()">로그인</button>
-    <div id="logMsg"></div>
   </div>
 
   <!-- 2. 신규 유저 게임 프로필 설정 화면 -->
@@ -78,30 +75,28 @@
 </div>
 
 <script>
-  // 1. 전역 변수 선언
+  // 전역 상태
   let authMode = 'login';
   let currentUser = null;
   let gameState = { level: 1, exp: 0, maxExp: 100, sunlight: 0, sunlightPerSec: 1 };
 
-  // Supabase 설정 (본인의 키 입력)
+  // Supabase 설정 (본인의 URL과 anon 키를 넣어주세요)
   const SUPABASE_URL = 'https://jizublzpkzkgngsabjkq.supabase.co';
   const SUPABASE_ANON_KEY = '여기에_복사한_anon_키를_붙여넣으세요';
-  
+
   let supabase;
   try {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch (err) {
-    showLog('Supabase 초기화 실패: ' + err.message);
+    alert('Supabase 연결 설정 오류: ' + err.message);
   }
 
-  // 2. 탭 전환 전용 함수 (오류 보정 완료)
+  // 1. 탭 전환 (로그인 <-> 회원가입)
   function switchAuthTab(mode) {
     authMode = mode;
     const loginTab = document.getElementById('tabLogin');
     const signupTab = document.getElementById('tabSignup');
     const submitBtn = document.getElementById('btnAuthSubmit');
-    
-    showLog('', false); // 로그 메시지 초기화
 
     if (mode === 'login') {
       loginTab.classList.add('active');
@@ -114,15 +109,7 @@
     }
   }
 
-  // 로그 메시지 출력 함수
-  function showLog(msg, isError = true) {
-    const logDiv = document.getElementById('logMsg');
-    if (logDiv) {
-      logDiv.style.color = isError ? '#e53935' : '#4CAF50';
-      logDiv.innerText = msg;
-    }
-  }
-
+  // 앱 실행 시 로그인 상태 확인
   window.onload = async () => {
     if (!supabase) return;
 
@@ -143,26 +130,25 @@
     });
   };
 
-  // 회원가입 및 로그인 처리
+  // 2. 로그인 및 회원가입 제출 처리
   async function handleAuthSubmit() {
-    showLog('', false);
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
 
     if (!username || !password) {
-      showLog('아이디와 비밀번호를 모두 입력해 주세요.');
+      alert('아이디와 비밀번호를 모두 입력해 주세요.');
       return;
     }
 
     if (password.length < 6) {
-      showLog('비밀번호는 최소 6자리 이상이어야 합니다.');
+      alert('비밀번호는 최소 6자리 이상이어야 합니다.');
       return;
     }
 
     const email = `${username.toLowerCase()}@game.com`;
 
     if (authMode === 'signup') {
-      showLog('회원가입 요청 중...', false);
+      // --- 회원가입 처리 ---
       const { data, error } = await supabase.auth.signUp({
         email: email,
         password: password,
@@ -170,24 +156,38 @@
       });
 
       if (error) {
-        showLog('회원가입 실패: ' + error.message);
+        // 회원가입 실패 시 이유 명확히 출력
+        alert('❌ 회원가입 실패원인:\n' + translateErrorMessage(error.message));
+      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+        // 이미 가입된 아이디인 경우
+        alert('❌ 이미 존재하는 아이디입니다.');
       } else {
-        showLog('가입 성공! 계정으로 진입합니다.', false);
+        alert('🎉 회원가입 성공! 게임 화면으로 이동합니다.');
+        // onAuthStateChange 감지에 의해 자동으로 프로필 및 게임 화면으로 이동
       }
     } else {
-      showLog('로그인 요청 중...', false);
+      // --- 로그인 처리 ---
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
       });
 
       if (error) {
-        showLog('로그인 실패: 아이디 또는 비밀번호를 확인하세요.');
+        alert('❌ 로그인 실패:\n' + translateErrorMessage(error.message));
       }
     }
   }
 
-  // 화면 전환
+  // 주요 에러 메시지 한글 번역 함수
+  function translateErrorMessage(msg) {
+    if (msg.includes('User already registered')) return '이미 가입된 아이디입니다.';
+    if (msg.includes('Invalid login credentials')) return '아이디 또는 비밀번호가 틀렸습니다.';
+    if (msg.includes('Password should be at least')) return '비밀번호는 6자리 이상이어야 합니다.';
+    if (msg.includes('API key')) return 'Supabase API 키 설정(ANON_KEY)을 확인해주세요.';
+    return msg; // 기타 에러는 기본 메시지 출력
+  }
+
+  // 3. 화면 전환 제어
   function showSection(sectionId) {
     document.getElementById('authSection').style.display = 'none';
     document.getElementById('profileSetupSection').style.display = 'none';
@@ -195,8 +195,10 @@
     document.getElementById(sectionId).style.display = 'block';
   }
 
-  // 게임 프로필 확인
+  // 4. 게임 프로필 존재 여부 확인 및 이동
   async function checkUserGameProfile() {
+    if (!currentUser) return;
+
     const { data, error } = await supabase
       .from('game_profiles')
       .select('*')
@@ -204,11 +206,12 @@
       .maybeSingle();
 
     if (error) {
-      showLog('프로필 확인 오류: ' + error.message);
+      alert('프로필 확인 오류: ' + error.message);
       return;
     }
 
     if (data) {
+      // 프로필 존재 -> 메인 게임 화면으로 이동
       gameState = data;
       const rawUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
       document.getElementById('displayUsername').innerText = rawUsername;
@@ -216,11 +219,12 @@
       updateUI();
       showSection('gameSection');
     } else {
+      // 프로필 없음 -> 프로필 생성 화면으로 이동
       showSection('profileSetupSection');
     }
   }
 
-  // 프로필 DB 저장
+  // 5. 프로필 신규 생성
   async function submitUserProfile() {
     const plantName = document.getElementById('plantName').value.trim();
     const rawUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
@@ -252,10 +256,13 @@
     }
   }
 
+  // 6. 로그아웃
   async function signOut() {
     await supabase.auth.signOut();
+    alert('로그아웃 되었습니다.');
   }
 
+  // 7. 인게임 기능 (물주기)
   function waterPlant() {
     gameState.sunlight += 10;
     updateUI();
