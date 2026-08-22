@@ -1,141 +1,198 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>식물 키우기 방치형 게임</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .game-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            text-align: center;
-            width: 320px;
-        }
-        .stage-display {
-            font-size: 5rem;
-            margin: 1.5rem 0;
-        }
-        .stats-box {
-            background: #eef7f2;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            text-align: left;
-        }
-        .stats-box p {
-            margin: 0.5rem 0;
-            color: #333;
-            font-weight: bold;
-        }
-        .btn {
-            background-color: #4caf50;
-            color: white;
-            border: none;
-            padding: 0.8rem 1.2rem;
-            font-size: 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            margin-bottom: 0.5rem;
-            transition: background-color 0.2s;
-        }
-        .btn:hover {
-            background-color: #45a049;
-        }
-        .btn-secondary {
-            background-color: #2196f3;
-        }
-        .btn-secondary:hover {
-            background-color: #0b7dda;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Supabase 연동 방치형 게임</title>
+  <!-- Supabase JS Client 라이브러리 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .card { border: 1px solid #ccc; padding: 20px; width: 300px; border-radius: 8px; }
+    button { margin-top: 10px; padding: 8px 12px; cursor: pointer; }
+  </style>
 </head>
 <body>
 
-<div class="game-card">
-    <h2>🌱 방치형 식물 키우기</h2>
-    <div class="stage-display" id="plantEmoji">🌱</div>
-    
-    <div class="stats-box">
-        <p>레벨: <span id="level">1</span></p>
-        <p>경험치: <span id="exp">0</span> / <span id="maxExp">100</span></p>
-        <p>햇살(재화): <span id="sunlight">0</span></p>
-    </div>
+<div class="card">
+  <h2>🌱 Supabase 방치형 게임</h2>
+  
+  <!-- 로그인 상태 표시 -->
+  <div id="authSection">
+    <button onclick="signInWithGoogle()">Google 로그인</button>
+  </div>
 
-    <button class="btn" onclick="waterPlant()">💧 물주기 (+10 EXP)</button>
-    <button class="btn btn-secondary" onclick="upgradeSunlight()">☀️ 햇살 생성기 업그레이드 (비용: <span id="upgradeCost">50</span> 햇살)</button>
+  <!-- 게임 영역 -->
+  <div id="gameSection" style="display: none;">
+    <p>레벨: <span id="level">1</span></p>
+    <p>경험치: <span id="exp">0</span> / <span id="maxExp">100</span></p>
+    <p>햇살: <span id="sunlight">0</span></p>
+    
+    <button onclick="waterPlant()">💧 물주기 (+10 EXP)</button>
+    <button onclick="saveGameData()">💾 수동 저장</button>
+    <p><small id="saveStatus" style="color: gray;"></small></p>
+  </div>
 </div>
 
 <script>
-    // 게임 데이터 상태
-    let gameState = {
-        level: 1,
-        exp: 0,
-        maxExp: 100,
-        sunlight: 0,
-        sunlightPerSec: 1,
-        upgradeCost: 50
-    };
+  // 1. Supabase 클라이언트 초기화
+  // Supabase Dashboard -> Project Settings -> API 에서 확인한 URL과 Anon Key를 입력하세요.
+  const SUPABASE_URL = 'https://jizublzpkzkgngsabjkq.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_mK36H1pcTCqzwGbgU2aIpQ_Og1HIidb';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 식물 상태 아이콘
-    const plantIcons = ['🌱', '🌿', '🪴', '🌳', '🌸'];
+  // 게임 글로벌 상태
+  let gameState = {
+    level: 1,
+    exp: 0,
+    maxExp: 100,
+    sunlight: 0,
+    sunlightPerSec: 1
+  };
+  let currentUser = null;
 
-    // 물주기 (클릭 동작)
-    function waterPlant() {
-        gameState.exp += 10;
-        checkLevelUp();
-        updateUI();
+  // 2. 앱 실행 시 세션 체크
+  window.onload = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      onLoggedIn();
     }
 
-    // 경험치 검사 및 레벨업
-    function checkLevelUp() {
-        if (gameState.exp >= gameState.maxExp) {
-            gameState.exp -= gameState.maxExp;
-            gameState.level += 1;
-            gameState.maxExp = Math.floor(gameState.maxExp * 1.5);
-            gameState.sunlightPerSec += 1;
-        }
-    }
+    // 로그인 상태 변화 감지
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        currentUser = session.user;
+        onLoggedIn();
+      } else {
+        currentUser = null;
+        document.getElementById('authSection').style.display = 'block';
+        document.getElementById('gameSection').style.display = 'none';
+      }
+    });
+  };
 
-    // 자동 재화 증가 (방치형 로직)
+  // Google 소셜 로그인
+  async function signInWithGoogle() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href }
+    });
+  }
+
+  // 로그인 성공 후 처리
+  async function onLoggedIn() {
+    document.getElementById('authSection').style.display = 'none';
+    document.getElementById('gameSection').style.display = 'block';
+    
+    // DB에서 게임 데이터 불러오기
+    await loadGameData();
+
+    // 1초마다 방치 재화 증가
     setInterval(() => {
-        gameState.sunlight += gameState.sunlightPerSec;
-        updateUI();
+      gameState.sunlight += gameState.sunlightPerSec;
+      updateUI();
     }, 1000);
 
-    // 업그레이드
-    function upgradeSunlight() {
-        if (gameState.sunlight >= gameState.upgradeCost) {
-            gameState.sunlight -= gameState.upgradeCost;
-            gameState.sunlightPerSec += 2;
-            gameState.upgradeCost = Math.floor(gameState.upgradeCost * 1.8);
-            updateUI();
+    // 30초마다 DB에 자동 저장
+    setInterval(() => {
+      saveGameData(true);
+    }, 30000);
+  }
+
+  // 3. DB에서 게임 데이터 불러오기 (READ)
+  async function loadGameData() {
+    if (!currentUser) return;
+
+    const { data, error } = await supabase
+      .from('game_profiles')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('데이터 로드 실패:', error.message);
+      return;
+    }
+
+    if (data) {
+      // 기존 저장된 데이터가 존재하면 게임 상태에 덮어쓰기
+      gameState.level = data.level;
+      gameState.exp = data.exp;
+      gameState.maxExp = data.max_exp;
+      gameState.sunlight = data.sunlight;
+      gameState.sunlightPerSec = data.sunlight_per_sec;
+      console.log('게임 데이터 로드 완료');
+    } else {
+      // 신규 유저일 경우 기본 프로필 생성 (INSERT)
+      await createInitialProfile();
+    }
+    updateUI();
+  }
+
+  // 신규 유저 초기 데이터 생성
+  async function createInitialProfile() {
+    const { error } = await supabase
+      .from('game_profiles')
+      .insert([
+        {
+          user_id: currentUser.id,
+          level: gameState.level,
+          exp: gameState.exp,
+          max_exp: gameState.maxExp,
+          sunlight: gameState.sunlight,
+          sunlight_per_sec: gameState.sunlightPerSec
         }
-    }
+      ]);
 
-    // 화면 갱신
-    function updateUI() {
-        document.getElementById('level').innerText = gameState.level;
-        document.getElementById('exp').innerText = gameState.exp;
-        document.getElementById('maxExp').innerText = gameState.maxExp;
-        document.getElementById('sunlight').innerText = gameState.sunlight;
-        document.getElementById('upgradeCost').innerText = gameState.upgradeCost;
+    if (error) console.error('신규 프로필 생성 실패:', error.message);
+  }
 
-        // 레벨에 따른 캐릭터 변화
-        const iconIndex = Math.min(Math.floor((gameState.level - 1) / 2), plantIcons.length - 1);
-        document.getElementById('plantEmoji').innerText = plantIcons[iconIndex];
+  // 4. DB에 게임 데이터 저장하기 (UPDATE)
+  async function saveGameData(isAutoSave = false) {
+    if (!currentUser) return;
+
+    document.getElementById('saveStatus').innerText = '저장 중...';
+
+    const { error } = await supabase
+      .from('game_profiles')
+      .update({
+        level: gameState.level,
+        exp: gameState.exp,
+        max_exp: gameState.maxExp,
+        sunlight: gameState.sunlight,
+        sunlight_per_sec: gameState.sunlightPerSec,
+        last_active_at: new Date().toISOString() // 마지막 활동 시간 기록
+      })
+      .eq('user_id', currentUser.id);
+
+    if (error) {
+      console.error('저장 실패:', error.message);
+      document.getElementById('saveStatus').innerText = '저장 실패!';
+    } else {
+      const timeStr = new Date().toLocaleTimeString();
+      document.getElementById('saveStatus').innerText = isAutoSave 
+        ? `자동 저장됨 (${timeStr})` 
+        : `저장 완료! (${timeStr})`;
     }
+  }
+
+  // 인게임 로직
+  function waterPlant() {
+    gameState.exp += 10;
+    if (gameState.exp >= gameState.maxExp) {
+      gameState.exp -= gameState.maxExp;
+      gameState.level += 1;
+      gameState.maxExp = Math.floor(gameState.maxExp * 1.5);
+    }
+    updateUI();
+  }
+
+  function updateUI() {
+    document.getElementById('level').innerText = gameState.level;
+    document.getElementById('exp').innerText = gameState.exp;
+    document.getElementById('maxExp').innerText = gameState.maxExp;
+    document.getElementById('sunlight').innerText = gameState.sunlight;
+  }
 </script>
 
 </body>
