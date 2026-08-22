@@ -80,15 +80,32 @@
   let currentUser = null;
   let gameState = { level: 1, exp: 0, maxExp: 100, sunlight: 0, sunlightPerSec: 1 };
 
-  // Supabase 설정 (본인의 URL과 anon 키를 넣어주세요)
+  // Supabase 설정
+  // 실제 프로젝트 URL/anon key를 넣어야 회원가입이 정상 동작합니다.
   const SUPABASE_URL = 'https://jizublzpkzkgngsabjkq.supabase.co';
   const SUPABASE_ANON_KEY = '여기에_복사한_anon_키를_붙여넣으세요';
 
-  let supabase;
-  try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  } catch (err) {
-    alert('Supabase 연결 설정 오류: ' + err.message);
+  let supabase = null;
+
+  function ensureSupabaseReady() {
+    const isPlaceholder = !SUPABASE_ANON_KEY ||
+      SUPABASE_ANON_KEY.includes('여기에_복사한_anon_키') ||
+      SUPABASE_ANON_KEY.includes('PUT_YOUR_');
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || isPlaceholder) {
+      alert('Supabase 설정이 아직 안 되어 있습니다.\n\n1) Supabase 프로젝트에서 anon key를 복사\n2) index.html의 SUPABASE_ANON_KEY를 실제 값으로 변경\n3) 다시 회원가입을 눌러주세요.');
+      return false;
+    }
+
+    try {
+      if (!supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+      return true;
+    } catch (err) {
+      alert('Supabase 연결 설정 오류: ' + err.message);
+      return false;
+    }
   }
 
   // 1. 탭 전환 (로그인 <-> 회원가입)
@@ -111,7 +128,7 @@
 
   // 앱 실행 시 로그인 상태 확인
   window.onload = async () => {
-    if (!supabase) return;
+    if (!ensureSupabaseReady()) return;
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
@@ -132,6 +149,8 @@
 
   // 2. 로그인 및 회원가입 제출 처리
   async function handleAuthSubmit() {
+    if (!ensureSupabaseReady()) return;
+
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
 
@@ -197,6 +216,7 @@
 
   // 4. 게임 프로필 존재 여부 확인 및 이동
   async function checkUserGameProfile() {
+    if (!ensureSupabaseReady()) return;
     if (!currentUser) return;
 
     const { data, error } = await supabase
@@ -226,6 +246,8 @@
 
   // 5. 프로필 신규 생성
   async function submitUserProfile() {
+    if (!ensureSupabaseReady()) return;
+
     const plantName = document.getElementById('plantName').value.trim();
     const rawUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
 
@@ -258,6 +280,7 @@
 
   // 6. 로그아웃
   async function signOut() {
+    if (!ensureSupabaseReady()) return;
     await supabase.auth.signOut();
     alert('로그아웃 되었습니다.');
   }
