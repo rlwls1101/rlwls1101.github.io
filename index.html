@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>방치형 게임 - 계정 로그인</title>
+  <title>방치형 게임 - ID 회원가입</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
@@ -28,7 +28,7 @@
 <div class="card">
   <h2>🌱 방치형 식물 키우기</h2>
 
-  <!-- 1. 계정 로그인 / 회원가입 화면 -->
+  <!-- 1. ID/비밀번호 가입 및 로그인 화면 -->
   <div id="authSection">
     <div class="tab-menu">
       <div id="tabLogin" class="active" onclick="switchAuthTab('login')">로그인</div>
@@ -36,8 +36,8 @@
     </div>
 
     <div class="form-group">
-      <label for="email">이메일 주소</label>
-      <input type="email" id="email" placeholder="example@email.com">
+      <label for="username">사용자 ID</label>
+      <input type="text" id="username" placeholder="영문/숫자 아이디" maxlength="15">
     </div>
 
     <div class="form-group">
@@ -48,18 +48,13 @@
     <button id="btnAuthSubmit" onclick="handleAuthSubmit()">로그인</button>
   </div>
 
-  <!-- 2. 신규 유저 게임 프로필 설정 화면 -->
+  <!-- 2. 신규 유저 게임 프로필 입력 화면 -->
   <div id="profileSetupSection" style="display: none;">
     <h3>👤 프로필 설정</h3>
-    <p style="font-size:0.85rem; color:#666;">첫 방문을 환영합니다! 정보를 입력해 주세요.</p>
-    
-    <div class="form-group">
-      <label for="nickname">플레이어 닉네임</label>
-      <input type="text" id="nickname" placeholder="예: 햇살키우미" maxlength="10">
-    </div>
+    <p style="font-size:0.85rem; color:#666;">계정이 생성되었습니다! 식물 이름을 지어주세요.</p>
 
     <div class="form-group">
-      <label for="plantName">식물 이름</label>
+      <label for="plantName">키울 식물 이름</label>
       <input type="text" id="plantName" placeholder="예: 초록이" maxlength="10">
     </div>
 
@@ -69,7 +64,7 @@
   <!-- 3. 인게임 메인 화면 -->
   <div id="gameSection" style="display: none;">
     <h3 id="displayPlantName">🪴 초록이</h3>
-    <p style="color:#666; font-size:0.9rem;">주인: <span id="displayNickname">유저</span></p>
+    <p style="color:#666; font-size:0.9rem;">주인 ID: <span id="displayUsername">유저</span></p>
     <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
     <p>레벨: <span id="level">1</span></p>
     <p>햇살: <span id="sunlight">0</span></p>
@@ -79,13 +74,13 @@
 </div>
 
 <script>
-  // Supabase 초기화
+  // Supabase 설정
   const SUPABASE_URL = 'https://jizublzpkzkgngsabjkq.supabase.co';
   const SUPABASE_ANON_KEY = '여기에_복사한_anon_키를_붙여넣으세요';
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let currentUser = null;
-  let authMode = 'login'; // 'login' 또는 'signup'
+  let authMode = 'login';
   let gameState = { level: 1, exp: 0, maxExp: 100, sunlight: 0, sunlightPerSec: 1 };
 
   window.onload = async () => {
@@ -114,29 +109,47 @@
     document.getElementById('btnAuthSubmit').innerText = mode === 'login' ? '로그인' : '회원가입';
   }
 
-  // 로그인 / 회원가입 제출
+  // ID를 가상 이메일 형태로 변환해주는 함수
+  function formatEmailFromUsername(username) {
+    return `${username.toLowerCase().trim()}@game.com`;
+  }
+
+  // 로그인 / 회원가입 제출 로직
   async function handleAuthSubmit() {
-    const email = document.getElementById('email').value.trim();
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
 
-    if (!email || !password) {
-      alert('이메일과 비밀번호를 모두 입력해 주세요.');
+    if (!username || !password) {
+      alert('아이디와 비밀번호를 모두 입력해 주세요.');
       return;
     }
 
+    const email = formatEmailFromUsername(username);
+
     if (authMode === 'signup') {
-      // 회원가입
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      // 1. 회원가입 실행
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: { username: username } // 가입 시 metadata에 원본 ID 저장
+        }
+      });
+
       if (error) {
         alert('회원가입 실패: ' + error.message);
       } else {
-        alert('회원가입이 완료되었습니다!');
+        alert('회원가입 성공! 가입하신 아이디로 바로 진입합니다.');
       }
     } else {
-      // 로그인
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      // 2. 로그인 실행
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
       if (error) {
-        alert('로그인 실패: ' + error.message);
+        alert('로그인 실패: 아이디 또는 비밀번호를 확인하세요.');
       }
     }
   }
@@ -153,7 +166,7 @@
     document.getElementById(sectionId).style.display = 'block';
   }
 
-  // 게임 프로필 존재 여부 확인
+  // 게임 프로필 확인
   async function checkUserGameProfile() {
     const { data, error } = await supabase
       .from('game_profiles')
@@ -168,7 +181,8 @@
 
     if (data) {
       gameState = data;
-      document.getElementById('displayNickname').innerText = data.nickname || '플레이어';
+      const rawUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      document.getElementById('displayUsername').innerText = rawUsername;
       document.getElementById('displayPlantName').innerText = `🪴 ${data.plant_name || '식물'}`;
       updateUI();
       showSection('gameSection');
@@ -177,13 +191,13 @@
     }
   }
 
-  // 게임 프로필 생성
+  // 식물 이름 입력 후 DB 저장 (INSERT)
   async function submitUserProfile() {
-    const nickname = document.getElementById('nickname').value.trim();
     const plantName = document.getElementById('plantName').value.trim();
+    const rawUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
 
-    if (!nickname || !plantName) {
-      alert('닉네임과 식물 이름을 모두 입력해 주세요!');
+    if (!plantName) {
+      alert('식물 이름을 입력해 주세요!');
       return;
     }
 
@@ -192,7 +206,7 @@
       .insert([
         {
           user_id: currentUser.id,
-          nickname: nickname,
+          nickname: rawUsername,
           plant_name: plantName,
           level: 1,
           exp: 0,
