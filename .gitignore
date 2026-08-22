@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+env/
+
+# Node
+node_modules/
+dist/
+
+# IDEs
+.vscode/
+.idea/
+
+# build
+build/
+dist/
