@@ -83,7 +83,7 @@
   // Supabase 설정
   // 실제 프로젝트 URL/anon key를 넣어야 회원가입이 정상 동작합니다.
   const SUPABASE_URL = 'https://jizublzpkzkgngsabjkq.supabase.co';
-  const SUPABASE_ANON_KEY = '여기에_복사한_anon_키를_붙여넣으세요';
+  const SUPABASE_ANON_KEY = 'sb_publishable_mK36H1pcTCqzwGbgU2aIpQ_Og1HIidb';
 
   let supabase = null;
 
@@ -127,24 +127,29 @@
   }
 
   // 앱 실행 시 로그인 상태 확인
+  // Supabase 키가 아직 없더라도 탭 전환은 가능하도록, 인증 체크는 실제 제출 시점으로 미룸
   window.onload = async () => {
-    if (!ensureSupabaseReady()) return;
+    if (!window.supabase) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      currentUser = session.user;
-      checkUserGameProfile();
-    }
-
-    supabase.auth.onAuthStateChange((_event, session) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         currentUser = session.user;
         checkUserGameProfile();
-      } else {
-        currentUser = null;
-        showSection('authSection');
       }
-    });
+
+      supabase.auth.onAuthStateChange((_event, session) => {
+        if (session) {
+          currentUser = session.user;
+          checkUserGameProfile();
+        } else {
+          currentUser = null;
+          showSection('authSection');
+        }
+      });
+    } catch (err) {
+      console.warn('Supabase 초기화 대기 중:', err.message);
+    }
   };
 
   // 2. 로그인 및 회원가입 제출 처리
