@@ -3,83 +3,267 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Supabase 테스트</title>
+  <title>방치형 게임 - ID 회원가입</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
-    .box { background: white; padding: 20px; border-radius: 8px; width: 300px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    input { width: 100%; padding: 8px; margin: 5px 0 10px; box-sizing: border-box; }
-    button { width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    #log { margin-top: 15px; color: red; font-size: 0.85rem; word-break: break-all; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .card { background: white; border-radius: 12px; padding: 24px; width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+    
+    .form-group { text-align: left; margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; color: #444; }
+    .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 0.95rem; }
+    
+    button { width: 100%; padding: 12px; border: none; border-radius: 6px; background: #4CAF50; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 8px; }
+    button:hover { background: #45a049; }
+    .btn-secondary { background: #fff; color: #555; border: 1px solid #ccc; margin-top: 6px; }
+    .btn-secondary:hover { background: #f5f5f5; }
+    
+    /* 탭 메뉴 스타일 */
+    .tab-menu { display: flex; margin-bottom: 16px; border-bottom: 2px solid #eee; }
+    .tab-btn { flex: 1; padding: 10px; cursor: pointer; font-weight: bold; color: #888; text-align: center; background: none; border: none; font-size: 1rem; margin: 0; }
+    .tab-btn.active { color: #4CAF50; border-bottom: 2px solid #4CAF50; }
+    
+    #logMsg { margin-top: 12px; font-size: 0.85rem; color: #e53935; word-break: break-all; }
   </style>
 </head>
 <body>
 
-<div class="box">
-  <h3>🌱 ID 회원가입 테스트</h3>
-  
-  <label>아이디</label>
-  <input type="text" id="username" placeholder="영문/숫자 아이디">
+<div class="card">
+  <h2>🌱 방치형 식물 키우기</h2>
 
-  <label>비밀번호</label>
-  <input type="password" id="password" placeholder="6자리 이상">
+  <!-- 1. 계정 인증 화면 -->
+  <div id="authSection">
+    <div class="tab-menu">
+      <button type="button" id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">로그인</button>
+      <button type="button" id="tabSignup" class="tab-btn" onclick="switchAuthTab('signup')">회원가입</button>
+    </div>
 
-  <button type="button" onclick="doSignUp()">회원가입 버튼 클릭</button>
+    <div class="form-group">
+      <label for="username">사용자 ID</label>
+      <input type="text" id="username" placeholder="영문/숫자 아이디" maxlength="15">
+    </div>
 
-  <div id="log"></div>
+    <div class="form-group">
+      <label for="password">비밀번호</label>
+      <input type="password" id="password" placeholder="6자리 이상 입력">
+    </div>
+
+    <button type="button" id="btnAuthSubmit" onclick="handleAuthSubmit()">로그인</button>
+    <div id="logMsg"></div>
+  </div>
+
+  <!-- 2. 신규 유저 게임 프로필 설정 화면 -->
+  <div id="profileSetupSection" style="display: none;">
+    <h3>👤 프로필 설정</h3>
+    <p style="font-size:0.85rem; color:#666;">계정이 생성되었습니다! 식물 이름을 지어주세요.</p>
+
+    <div class="form-group">
+      <label for="plantName">키울 식물 이름</label>
+      <input type="text" id="plantName" placeholder="예: 초록이" maxlength="10">
+    </div>
+
+    <button type="button" onclick="submitUserProfile()">게임 시작하기 🚀</button>
+  </div>
+
+  <!-- 3. 인게임 메인 화면 -->
+  <div id="gameSection" style="display: none;">
+    <h3 id="displayPlantName">🪴 초록이</h3>
+    <p style="color:#666; font-size:0.9rem;">주인 ID: <span id="displayUsername">유저</span></p>
+    <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+    <p>레벨: <span id="level">1</span></p>
+    <p>햇살: <span id="sunlight">0</span></p>
+    <button type="button" onclick="waterPlant()">💧 물주기 (+10 EXP)</button>
+    <button type="button" class="btn-secondary" onclick="signOut()">로그아웃</button>
+  </div>
 </div>
 
 <script>
-  function printLog(msg, isError = true) {
-    const logDiv = document.getElementById('log');
-    logDiv.style.color = isError ? 'red' : 'green';
-    logDiv.innerText = msg;
-  }
+  // 1. 전역 변수 선언
+  let authMode = 'login';
+  let currentUser = null;
+  let gameState = { level: 1, exp: 0, maxExp: 100, sunlight: 0, sunlightPerSec: 1 };
 
-  // 1. Supabase 키 설정
+  // Supabase 설정 (본인의 키 입력)
   const SUPABASE_URL = 'https://jizublzpkzkgngsabjkq.supabase.co';
-  const SUPABASE_ANON_KEY = '여기에_복사한_anon_키를_붙여넣으세요'; // <-- 본인 anon 키로 교체
-
+  const SUPABASE_ANON_KEY = '여기에_복사한_anon_키를_붙여넣으세요';
+  
   let supabase;
   try {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  } catch (e) {
-    printLog('Supabase 초기화 에러: ' + e.message);
+  } catch (err) {
+    showLog('Supabase 초기화 실패: ' + err.message);
   }
 
-  // 2. 회원가입 함수
-  async function doSignUp() {
-    printLog('회원가입 요청 중...', false);
+  // 2. 탭 전환 전용 함수 (오류 보정 완료)
+  function switchAuthTab(mode) {
+    authMode = mode;
+    const loginTab = document.getElementById('tabLogin');
+    const signupTab = document.getElementById('tabSignup');
+    const submitBtn = document.getElementById('btnAuthSubmit');
+    
+    showLog('', false); // 로그 메시지 초기화
 
+    if (mode === 'login') {
+      loginTab.classList.add('active');
+      signupTab.classList.remove('active');
+      submitBtn.innerText = '로그인';
+    } else {
+      signupTab.classList.add('active');
+      loginTab.classList.remove('active');
+      submitBtn.innerText = '회원가입';
+    }
+  }
+
+  // 로그 메시지 출력 함수
+  function showLog(msg, isError = true) {
+    const logDiv = document.getElementById('logMsg');
+    if (logDiv) {
+      logDiv.style.color = isError ? '#e53935' : '#4CAF50';
+      logDiv.innerText = msg;
+    }
+  }
+
+  window.onload = async () => {
+    if (!supabase) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      checkUserGameProfile();
+    }
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        currentUser = session.user;
+        checkUserGameProfile();
+      } else {
+        currentUser = null;
+        showSection('authSection');
+      }
+    });
+  };
+
+  // 회원가입 및 로그인 처리
+  async function handleAuthSubmit() {
+    showLog('', false);
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
 
     if (!username || !password) {
-      printLog('아이디와 비밀번호를 모두 입력하세요.');
+      showLog('아이디와 비밀번호를 모두 입력해 주세요.');
       return;
     }
 
     if (password.length < 6) {
-      printLog('비밀번호는 6자리 이상이어야 합니다.');
+      showLog('비밀번호는 최소 6자리 이상이어야 합니다.');
       return;
     }
 
-    const email = username.toLowerCase() + '@game.com';
+    const email = `${username.toLowerCase()}@game.com`;
 
-    try {
+    if (authMode === 'signup') {
+      showLog('회원가입 요청 중...', false);
       const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: { data: { username: username } }
+      });
+
+      if (error) {
+        showLog('회원가입 실패: ' + error.message);
+      } else {
+        showLog('가입 성공! 계정으로 진입합니다.', false);
+      }
+    } else {
+      showLog('로그인 요청 중...', false);
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
       });
 
       if (error) {
-        printLog('Supabase 에러: ' + error.message);
-      } else {
-        printLog('가입 성공! 유저 ID: ' + data.user.id, false);
+        showLog('로그인 실패: 아이디 또는 비밀번호를 확인하세요.');
       }
-    } catch (err) {
-      printLog('네트워크/코드 오류: ' + err.message);
     }
+  }
+
+  // 화면 전환
+  function showSection(sectionId) {
+    document.getElementById('authSection').style.display = 'none';
+    document.getElementById('profileSetupSection').style.display = 'none';
+    document.getElementById('gameSection').style.display = 'none';
+    document.getElementById(sectionId).style.display = 'block';
+  }
+
+  // 게임 프로필 확인
+  async function checkUserGameProfile() {
+    const { data, error } = await supabase
+      .from('game_profiles')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+    if (error) {
+      showLog('프로필 확인 오류: ' + error.message);
+      return;
+    }
+
+    if (data) {
+      gameState = data;
+      const rawUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+      document.getElementById('displayUsername').innerText = rawUsername;
+      document.getElementById('displayPlantName').innerText = `🪴 ${data.plant_name || '식물'}`;
+      updateUI();
+      showSection('gameSection');
+    } else {
+      showSection('profileSetupSection');
+    }
+  }
+
+  // 프로필 DB 저장
+  async function submitUserProfile() {
+    const plantName = document.getElementById('plantName').value.trim();
+    const rawUsername = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+
+    if (!plantName) {
+      alert('식물 이름을 입력해 주세요!');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('game_profiles')
+      .insert([
+        {
+          user_id: currentUser.id,
+          nickname: rawUsername,
+          plant_name: plantName,
+          level: 1,
+          exp: 0,
+          max_exp: 100,
+          sunlight: 0,
+          sunlight_per_sec: 1
+        }
+      ]);
+
+    if (error) {
+      alert('프로필 생성 실패: ' + error.message);
+    } else {
+      checkUserGameProfile();
+    }
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+  }
+
+  function waterPlant() {
+    gameState.sunlight += 10;
+    updateUI();
+  }
+
+  function updateUI() {
+    document.getElementById('level').innerText = gameState.level;
+    document.getElementById('sunlight').innerText = gameState.sunlight;
   }
 </script>
 
