@@ -46,7 +46,7 @@
       <input type="password" id="password" placeholder="6자리 이상 입력">
     </div>
 
-    <button type="button" id="btnAuthSubmit" onclick="handleAuthSubmit()">로그인</button>
+    <button type="button" id="btnAuthSubmit">로그인</button>
   </div>
 
   <!-- 2. 신규 유저 게임 프로필 설정 화면 -->
@@ -59,7 +59,7 @@
       <input type="text" id="plantName" placeholder="예: 초록이" maxlength="10">
     </div>
 
-    <button type="button" onclick="submitUserProfile()">게임 시작하기 🚀</button>
+    <button type="button" id="btnProfileSubmit">게임 시작하기 🚀</button>
   </div>
 
   <!-- 3. 인게임 메인 화면 -->
@@ -69,8 +69,8 @@
     <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
     <p>레벨: <span id="level">1</span></p>
     <p>햇살: <span id="sunlight">0</span></p>
-    <button type="button" onclick="waterPlant()">💧 물주기 (+10 EXP)</button>
-    <button type="button" class="btn-secondary" onclick="signOut()">로그아웃</button>
+    <button type="button" id="btnWaterPlant">💧 물주기 (+10 EXP)</button>
+    <button type="button" id="btnSignOut" class="btn-secondary">로그아웃</button>
   </div>
 </div>
 
@@ -129,12 +129,28 @@
   function bindAuthTabs() {
     const loginTab = document.getElementById('tabLogin');
     const signupTab = document.getElementById('tabSignup');
+    const submitBtn = document.getElementById('btnAuthSubmit');
+    const profileSubmitBtn = document.getElementById('btnProfileSubmit');
+    const waterBtn = document.getElementById('btnWaterPlant');
+    const signOutBtn = document.getElementById('btnSignOut');
 
     if (loginTab) {
       loginTab.addEventListener('click', () => switchAuthTab('login'));
     }
     if (signupTab) {
       signupTab.addEventListener('click', () => switchAuthTab('signup'));
+    }
+    if (submitBtn) {
+      submitBtn.addEventListener('click', handleAuthSubmit);
+    }
+    if (profileSubmitBtn) {
+      profileSubmitBtn.addEventListener('click', submitUserProfile);
+    }
+    if (waterBtn) {
+      waterBtn.addEventListener('click', waterPlant);
+    }
+    if (signOutBtn) {
+      signOutBtn.addEventListener('click', signOut);
     }
   }
 
