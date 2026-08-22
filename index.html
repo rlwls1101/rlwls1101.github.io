@@ -32,8 +32,8 @@
   <!-- 1. 로그인 / 회원가입 화면 -->
   <div id="authSection">
     <div class="tab-menu">
-      <button type="button" id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">로그인</button>
-      <button type="button" id="tabSignup" class="tab-btn" onclick="switchAuthTab('signup')">회원가입</button>
+      <button type="button" id="tabLogin" class="tab-btn active">로그인</button>
+      <button type="button" id="tabSignup" class="tab-btn">회원가입</button>
     </div>
 
     <div class="form-group">
@@ -126,9 +126,23 @@
     }
   }
 
+  function bindAuthTabs() {
+    const loginTab = document.getElementById('tabLogin');
+    const signupTab = document.getElementById('tabSignup');
+
+    if (loginTab) {
+      loginTab.addEventListener('click', () => switchAuthTab('login'));
+    }
+    if (signupTab) {
+      signupTab.addEventListener('click', () => switchAuthTab('signup'));
+    }
+  }
+
   // 앱 실행 시 로그인 상태 확인
   // Supabase 키가 아직 없더라도 탭 전환은 가능하도록, 인증 체크는 실제 제출 시점으로 미룸
   window.onload = async () => {
+    bindAuthTabs();
+
     if (!window.supabase) return;
 
     try {
